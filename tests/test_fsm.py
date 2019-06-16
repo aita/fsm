@@ -31,6 +31,22 @@ class TestDFA:
     def test_accept(self, target, string, expected):
         assert target.accept(string) == expected
 
+    @pytest.mark.parametrize(
+        "string,expected",
+        [("abab", True), ("aa", False), ("baa", True), ("baba", True)],
+    )
+    def test_reversed(self, target, string, expected):
+        nfa = target.reversed()
+        assert nfa.accept(string) == expected
+
+    @pytest.mark.parametrize(
+        "string,expected", [("a", False), ("aa", False), ("baa", False), ("baba", True)]
+    )
+    def teset_minimized(self, target, string, expected):
+        minimized_dfa = target.minimized()
+        assert minimized_dfa.accept(string) == expected
+        assert minimized_dfa.rules <= target.rules
+
 
 class TestNFA:
     @pytest.fixture
