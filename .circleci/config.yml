@@ -1,0 +1,25 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: circleci/python
+    steps:
+      - checkout
+      - run:
+          name: install dependencies with poetry
+          command: poetry install
+      - run:
+          name: pytest
+          command: poetry run pytest
+      - run:
+          name: black
+          command: poetry run black --check --diff ./
+      - run:
+          name: flake8
+          command: poetry run flake8 ./
+
+workflows:
+  test:
+    jobs:
+      - test
