@@ -132,4 +132,3 @@ class TestEpsillonNFA:
     def test_to_DFA(self, target, string, expected):
         dfa = target.to_DFA()
         assert dfa.accept(string) == expected
-
