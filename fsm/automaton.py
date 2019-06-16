@@ -19,11 +19,13 @@ class DFA:
         self.initial_state = initial_state
         self.final_states = frozenset(final_states)
         self.rules = rules
+        self._init()
 
+    def _init(self):
         self.transitions = defaultdict(dict)
         alphabet = set()
         states = set()
-        for current_state, character, next_state in rules:
+        for current_state, character, next_state in self.rules:
             self.transitions[current_state][character] = next_state
             alphabet.add(character)
             states.add(current_state)
@@ -31,8 +33,8 @@ class DFA:
         self.alphabet = frozenset(alphabet)
         self.states = frozenset(states)
 
-    def next_state(self, state, ch):
-        return self.transitions[state].get(ch)
+    def next_state(self, state, c):
+        return self.transitions[state].get(c)
 
     def accept(self, s):
         state = self.initial_state
@@ -45,17 +47,57 @@ class DFA:
     def to_dot(self, *args, **kwargs):
         return DotGenerator(*args, **kwargs).generate(self)
 
+    def reversed(self):
+        nfa = []
+        for current_state, character, next_state in self.rules:
+            nfa.append((next_state, character, current_state))
+        initial_state = len(self.states)
+        while initial_state in self.states:
+            initial_state += 1
+        for state in self.final_states:
+            nfa.append((initial_state, EPSILON, state))
+        return EpsillonNFA(initial_state, frozenset({self.initial_state}), nfa)
+
+    def rename_states(self):
+        q = 0
+        names = {self.initial_state: q}
+        q += 1
+        queue = [self.initial_state]
+        while queue:
+            current_state = queue.pop()
+            for c in self.alphabet:
+                next_state = self.next_state(current_state, c)
+                if not next_state:
+                    continue
+                if next_state not in names:
+                    names[next_state] = q
+                    q += 1
+                    queue.append(next_state)
+
+        self.initial_state = names[self.initial_state]
+        self.final_states = {names[x] for x in self.final_states}
+        self.rules = [(names[x], c, names[y]) for x, c, y in self.rules]
+        self._init()
+
+    def minimized(self):
+        "DFA minimization with Brzozowski's algorithm"
+        minimized = self.reversed().to_DFA().reversed().to_DFA()
+        minimized.rename_states()
+        return minimized
+
 
 class NFA:
     def __init__(self, initial_state, final_states, rules):
         self.initial_state = initial_state
         self.final_states = final_states
         self.rules = rules
+        self._init()
 
+    def _init(self):
         self.transitions = defaultdict(lambda: defaultdict(set))
         alphabet = set()
         states = set()
-        for current_state, character, next_state in rules:
+        for current_state, character, next_state in self.rules:
             self.transitions[current_state][character].add(next_state)
             alphabet.add(character)
             states.add(current_state)
@@ -63,8 +105,8 @@ class NFA:
         self.alphabet = frozenset(alphabet)
         self.states = frozenset(states)
 
-    def next_states(self, state, ch):
-        return frozenset(self.transitions[state].get(ch, []))
+    def next_states(self, state, c):
+        return frozenset(self.transitions[state].get(c, []))
 
     def accept(self, s):
         current_states = {self.initial_state}
@@ -94,11 +136,9 @@ class NFA:
                 if next_state not in states:
                     states.add(next_state)
                     queue.append(next_state)
-        final_states = {x for x in states if len(self.final_states.intersection(x)) > 0}
+        final_states = {x for x in states if len(self.final_states & x) > 0}
         rules = [
-            (current_state, character, next_state)
-            for current_state, edges in transitions.items()
-            for character, next_state in edges.items()
+            (x, c, y) for x, edges in transitions.items() for c, y in edges.items()
         ]
         return DFA(initial_state, final_states, rules)
 
@@ -117,8 +157,8 @@ class EpsillonNFA(NFA):
             queue.extend(next_states)
         return frozenset(states)
 
-    def next_states(self, state, ch):
-        states = self.transitions[state].get(ch, set())
+    def next_states(self, state, c):
+        states = self.transitions[state].get(c, set())
         next_states = set(states)
         for x in states:
             next_states |= self.next_states_with_epsilon(x)
@@ -156,11 +196,9 @@ class EpsillonNFA(NFA):
                 if next_state not in states:
                     states.add(next_state)
                     queue.append(next_state)
-        final_states = {x for x in states if len(self.final_states.intersection(x)) > 0}
+        final_states = {x for x in states if len(self.final_states & x) > 0}
         rules = [
-            (current_state, character, next_state)
-            for current_state, edges in transitions.items()
-            for character, next_state in edges.items()
+            (x, c, y) for x, edges in transitions.items() for c, y in edges.items()
         ]
         return DFA(initial_state, final_states, rules)
 
@@ -173,7 +211,7 @@ class DotGenerator:
         if isinstance(state, str):
             return state
         if isinstance(state, Iterable):
-            s = ",".join(self._format_state(x) for x in state)
+            s = ",".join(self._format_state(x) for x in sorted(state))
             return "{%s}" % s
         return str(state)
 
@@ -186,7 +224,7 @@ class DotGenerator:
         indent = " " * self.indent
 
         output = io.StringIO()
-        output.write("digraph G {\n")
+        output.write("digraph {\n")
         output.write(indent + "rankdir=LR;\n")
         output.write(indent + 'empty [label = "" shape = plaintext];\n')
         output.write(indent + "node [shape = doublecircle]; ")
