@@ -1,6 +1,5 @@
-import io
 from collections import defaultdict
-from collections.abc import Iterable
+from . import dot
 
 
 class SpecialCharacter:
@@ -45,7 +44,7 @@ class DFA:
         return state in self.final_states
 
     def to_dot(self, *args, **kwargs):
-        return DotGenerator(*args, **kwargs).generate(self)
+        return dot.generate(self, *args, **kwargs)
 
     def reversed(self):
         nfa = []
@@ -143,7 +142,7 @@ class NFA:
         return DFA(initial_state, final_states, rules)
 
     def to_dot(self, *args, **kwargs):
-        return DotGenerator(*args, **kwargs).generate(self)
+        return dot.generate(self, *args, **kwargs)
 
 
 class EpsillonNFA(NFA):
@@ -202,42 +201,3 @@ class EpsillonNFA(NFA):
         ]
         return DFA(initial_state, final_states, rules)
 
-
-class DotGenerator:
-    def __init__(self, indent=4):
-        self.indent = indent
-
-    def _format_state(self, state):
-        if isinstance(state, str):
-            return state
-        if isinstance(state, Iterable):
-            s = ",".join(self._format_state(x) for x in sorted(state))
-            return "{%s}" % s
-        return str(state)
-
-    def format_state(self, state):
-        s = self._format_state(state)
-        return f'"{s}"'
-
-    def generate(self, automata):
-        format_state = self.format_state
-        indent = " " * self.indent
-
-        output = io.StringIO()
-        output.write("digraph {\n")
-        output.write(indent + "rankdir=LR;\n")
-        output.write(indent + 'empty [label = "" shape = plaintext];\n')
-        output.write(indent + "node [shape = doublecircle]; ")
-        output.write(" ".join([format_state(x) for x in automata.final_states]) + ";\n")
-        output.write(indent + "node [shape = circle];\n")
-        output.write(indent)
-        output.write(
-            f'empty -> {format_state(automata.initial_state)} [label = "start"];\n'
-        )
-        for current_state, character, next_state in automata.rules:
-            output.write(indent)
-            output.write(
-                f'{format_state(current_state)} -> {format_state(next_state)} [label = "{character}"];\n'
-            )
-        output.write("}\n")
-        return output.getvalue()
