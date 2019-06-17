@@ -51,9 +51,7 @@ class DFA:
         for current_state, character, next_state in self.rules:
             nfa.append((next_state, character, current_state))
         if len(self.final_states) == 1:
-            return NFA(
-                list(self.final_states)[0], frozenset({self.initial_state}), nfa
-            )
+            return NFA(list(self.final_states)[0], frozenset({self.initial_state}), nfa)
         initial_state = len(self.states)
         while initial_state in self.states:
             initial_state += 1
@@ -204,4 +202,3 @@ class EpsillonNFA(NFA):
             (x, c, y) for x, edges in transitions.items() for c, y in edges.items()
         ]
         return DFA(initial_state, final_states, rules)
-
