@@ -1,6 +1,8 @@
 import io
 from collections.abc import Iterable
 
+from graphviz import Digraph
+
 
 def _format_state(state):
     if isinstance(state, str):
@@ -16,27 +18,20 @@ def _format_state(state):
 
 def format_state(state):
     s = _format_state(state)
-    return f'"{s}"'
+    return f"{s}"
 
 
-def generate(automaton, indent=4):
-    indent = " " * indent
-
-    output = io.StringIO()
-    output.write("digraph {\n")
-    output.write(indent + "rankdir=LR;\n")
-    output.write(indent + 'empty [label = "" shape = plaintext];\n')
-    output.write(indent + "node [shape = doublecircle]; ")
-    output.write(" ".join([format_state(x) for x in automaton.final_states]) + ";\n")
-    output.write(indent + "node [shape = circle];\n")
-    output.write(indent)
-    output.write(
-        f'empty -> {format_state(automaton.initial_state)} [label = "start"];\n'
-    )
+def generate(automaton):
+    dot = Digraph()
+    dot.attr(rankdir="LR")
+    dot.node("empty", label="", shape="plaintext")
+    dot.attr("node", shape="doublecircle")
+    for x in automaton.final_states:
+        dot.node(format_state(x))
+    dot.attr("node", shape="circle")
+    dot.edge("empty", format_state(automaton.initial_state), label="start")
     for current_state, character, next_state in automaton.rules:
-        output.write(indent)
-        output.write(
-            f'{format_state(current_state)} -> {format_state(next_state)} [label = "{character}"];\n'
+        dot.edge(
+            format_state(current_state), format_state(next_state), label=str(character)
         )
-    output.write("}\n")
-    return output.getvalue()
+    return dot

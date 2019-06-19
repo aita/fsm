@@ -120,7 +120,7 @@ class NFA:
             current_states = next_states
         return len(current_states & self.final_states) > 0
 
-    def to_DFA(self):
+    def to_DFA(self, rename=False):
         transitions = defaultdict(dict)
         initial_state = frozenset({self.initial_state})
         states = {initial_state}
@@ -141,7 +141,10 @@ class NFA:
         rules = [
             (x, c, y) for x, edges in transitions.items() for c, y in edges.items()
         ]
-        return DFA(initial_state, final_states, rules)
+        dfa = DFA(initial_state, final_states, rules)
+        if rename:
+            dfa.rename_states()
+        return dfa
 
     def to_dot(self, *args, **kwargs):
         return dot.generate(self, *args, **kwargs)
@@ -177,7 +180,7 @@ class EpsillonNFA(NFA):
             current_states = next_states
         return len(current_states & self.final_states) > 0
 
-    def to_DFA(self):
+    def to_DFA(self, rename=False):
         transitions = defaultdict(dict)
         initial_state = frozenset(
             {self.initial_state, *self.next_states_with_epsilon(self.initial_state)}
@@ -201,4 +204,7 @@ class EpsillonNFA(NFA):
         rules = [
             (x, c, y) for x, edges in transitions.items() for c, y in edges.items()
         ]
-        return DFA(initial_state, final_states, rules)
+        dfa = DFA(initial_state, final_states, rules)
+        if rename:
+            dfa.rename_states()
+        return dfa
