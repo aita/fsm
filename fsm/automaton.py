@@ -46,19 +46,6 @@ class DFA:
     def to_dot(self, *args, **kwargs):
         return dot.generate(self, *args, **kwargs)
 
-    def reversed(self):
-        nfa = []
-        for current_state, character, next_state in self.rules:
-            nfa.append((next_state, character, current_state))
-        if len(self.final_states) == 1:
-            return NFA(list(self.final_states)[0], frozenset({self.initial_state}), nfa)
-        initial_state = len(self.states)
-        while initial_state in self.states:
-            initial_state += 1
-        for state in self.final_states:
-            nfa.append((initial_state, EPSILON, state))
-        return EpsillonNFA(initial_state, frozenset({self.initial_state}), nfa)
-
     def rename_states(self):
         q = 0
         names = {self.initial_state: q}
@@ -82,15 +69,26 @@ class DFA:
 
     def minimized(self):
         "DFA minimization with Brzozowski's algorithm"
-        minimized = self.reversed().to_DFA().reversed().to_DFA()
+        minimized = self._reversed().to_DFA()._reversed().to_DFA()
         minimized.rename_states()
         return minimized
+
+    def _reversed(self):
+        nfa = []
+        for current_state, character, next_state in self.rules:
+            nfa.append((next_state, character, current_state))
+        if len(self.final_states) == 1:
+            return NFA(list(self.final_states)[0], frozenset({self.initial_state}), nfa)
+        initial_state = len(self.states)
+        return _MultiInitalStatesNFA(
+            self.final_states, frozenset({self.initial_state}), nfa
+        )
 
 
 class NFA:
     def __init__(self, initial_state, final_states, rules):
         self.initial_state = initial_state
-        self.final_states = final_states
+        self.final_states = frozenset(final_states)
         self.rules = rules
         self._init()
 
@@ -148,6 +146,54 @@ class NFA:
 
     def to_dot(self, *args, **kwargs):
         return dot.generate(self, *args, **kwargs)
+
+
+class _MultiInitalStatesNFA(NFA):
+    def __init__(self, initial_states, final_states, rules):
+        self.initial_states = frozenset(initial_states)
+        self.final_states = frozenset(final_states)
+        self.rules = rules
+        self._init()
+
+    def accept(self, s):
+        current_states = self.initial_states
+        for c in s:
+            next_states = set()
+            for state in current_states:
+                next_states |= self.next_states(state, c)
+            if not next_states:
+                return False
+            current_states = next_states
+        return len(current_states & self.final_states) > 0
+
+    def to_DFA(self, rename=False):
+        transitions = defaultdict(dict)
+        initial_states = self.initial_states
+        states = {initial_states}
+        queue = [initial_states]
+        while queue:
+            current_state = queue.pop()
+            for c in self.alphabet:
+                next_state = frozenset(
+                    {y for x in current_state for y in self.next_states(x, c)}
+                )
+                if not next_state:
+                    continue
+                transitions[current_state][c] = next_state
+                if next_state not in states:
+                    states.add(next_state)
+                    queue.append(next_state)
+        final_states = {x for x in states if len(self.final_states & x) > 0}
+        rules = [
+            (x, c, y) for x, edges in transitions.items() for c, y in edges.items()
+        ]
+        dfa = DFA(initial_states, final_states, rules)
+        if rename:
+            dfa.rename_states()
+        return dfa
+
+    def to_dot(self, *args, **kwargs):
+        raise NotImplementedError
 
 
 class EpsillonNFA(NFA):
