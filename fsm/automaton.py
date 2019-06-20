@@ -119,30 +119,7 @@ class NFA:
         return len(current_states & self.final_states) > 0
 
     def to_DFA(self, rename=False):
-        transitions = defaultdict(dict)
-        initial_state = frozenset({self.initial_state})
-        states = {initial_state}
-        queue = [initial_state]
-        while queue:
-            current_state = queue.pop()
-            for c in self.alphabet:
-                next_state = frozenset(
-                    {y for x in current_state for y in self.next_states(x, c)}
-                )
-                if not next_state:
-                    continue
-                transitions[current_state][c] = next_state
-                if next_state not in states:
-                    states.add(next_state)
-                    queue.append(next_state)
-        final_states = {x for x in states if len(self.final_states & x) > 0}
-        rules = [
-            (x, c, y) for x, edges in transitions.items() for c, y in edges.items()
-        ]
-        dfa = DFA(initial_state, final_states, rules)
-        if rename:
-            dfa.rename_states()
-        return dfa
+        return _convert_NFA_to_DFA(frozenset({self.initial_state}), rename)
 
     def to_dot(self, *args, **kwargs):
         return dot.generate(self, *args, **kwargs)
@@ -167,33 +144,35 @@ class _MultiInitalStatesNFA(NFA):
         return len(current_states & self.final_states) > 0
 
     def to_DFA(self, rename=False):
-        transitions = defaultdict(dict)
-        initial_states = self.initial_states
-        states = {initial_states}
-        queue = [initial_states]
-        while queue:
-            current_state = queue.pop()
-            for c in self.alphabet:
-                next_state = frozenset(
-                    {y for x in current_state for y in self.next_states(x, c)}
-                )
-                if not next_state:
-                    continue
-                transitions[current_state][c] = next_state
-                if next_state not in states:
-                    states.add(next_state)
-                    queue.append(next_state)
-        final_states = {x for x in states if len(self.final_states & x) > 0}
-        rules = [
-            (x, c, y) for x, edges in transitions.items() for c, y in edges.items()
-        ]
-        dfa = DFA(initial_states, final_states, rules)
-        if rename:
-            dfa.rename_states()
-        return dfa
+        return _convert_NFA_to_DFA(self.initial_states, rename)
 
     def to_dot(self, *args, **kwargs):
         raise NotImplementedError
+
+
+def _convert_NFA_to_DFA(nfa, start, rename):
+    transitions = defaultdict(dict)
+    initial_state = start
+    states = {initial_state}
+    queue = [initial_state]
+    while queue:
+        current_state = queue.pop()
+        for c in nfa.alphabet:
+            next_state = frozenset(
+                {y for x in current_state for y in snfaelf.next_states(x, c)}
+            )
+            if not next_state:
+                continue
+            transitions[current_state][c] = next_state
+            if next_state not in states:
+                states.add(next_state)
+                queue.append(next_state)
+    final_states = {x for x in states if len(nfa.final_states & x) > 0}
+    rules = [(x, c, y) for x, edges in transitions.items() for c, y in edges.items()]
+    dfa = DFA(initial_state, final_states, rules)
+    if rename:
+        dfa.rename_states()
+    return dfa
 
 
 class EpsillonNFA(NFA):
@@ -254,3 +233,4 @@ class EpsillonNFA(NFA):
         if rename:
             dfa.rename_states()
         return dfa
+

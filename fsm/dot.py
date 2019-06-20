@@ -24,7 +24,10 @@ def format_state(state):
 def generate(automaton):
     dot = Digraph()
     dot.attr(rankdir="LR")
-    dot.node("empty", label="", shape="plaintext")
+    empty_node = "empty"
+    while empty_node in automaton.states:
+        empty_node = "_" + empty_node
+    dot.node(empty_node, label="", shape="plaintext")
     dot.attr("node", shape="doublecircle")
     for x in automaton.final_states:
         dot.node(format_state(x))
